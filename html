@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UCSC NavAI — Campus Navigation</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<nav>
+  <div class="logo">
+    <div class="logo-mark">🏫</div>
+    <div>
+      <div class="logo-text">UCSC NAV</div>
+      <div class="logo-sub">Campus Navigation System</div>
+    </div>
+  </div>
+  <div class="nav-pills">
+    <div class="nav-pill"><div class="dot-live"></div>4 FLOORS MAPPED</div>
+    <div class="nav-pill">OFFLINE READY</div>
+  </div>
+</nav>
+
+<div class="wrapper">
+  <div class="sidebar">
+    <div class="hero-text">
+      <p class="hero-label">↗ University of Colombo School of Computing</p>
+      <h1 class="hero-title">Find Your<br><span class="highlight">Way Around</span></h1>
+      <p class="hero-sub">Select your starting point and destination. The navigation engine will generate instant step-by-step directions.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-icon" style="background:linear-gradient(135deg,var(--accent-green),#059669)">📍</div>
+        <div>
+          <h3>STARTING POINT</h3>
+          <p id="startLabel">No location selected</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="floor-label">Filter by floor</div>
+        <div class="floor-tabs" id="startTabs">
+          <div class="floor-tab active" onclick="setFloor('start','all',this)">ALL</div>
+          <div class="floor-tab" onclick="setFloor('start','1',this)">1F</div>
+          <div class="floor-tab" onclick="setFloor('start','2',this)">2F</div>
+          <div class="floor-tab" onclick="setFloor('start','3',this)">3F</div>
+          <div class="floor-tab" onclick="setFloor('start','4',this)">4F</div>
+        </div>
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="startSearch" placeholder="Search rooms, labs, offices…" oninput="renderList('start')">
+        </div>
+        <div class="loc-list" id="startList"></div>
+        <div class="selected-info start" id="startInfo"></div>
+      </div>
+    </div>
+
+    <div class="card" style="animation-delay:.65s">
+      <div class="card-head">
+        <div class="card-head-icon" style="background:linear-gradient(135deg,var(--accent-orange),#b45309)">🏁</div>
+        <div>
+          <h3>DESTINATION</h3>
+          <p id="destLabel">No location selected</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="floor-label">Filter by floor</div>
+        <div class="floor-tabs" id="destTabs">
+          <div class="floor-tab active" onclick="setFloor('dest','all',this)">ALL</div>
+          <div class="floor-tab" onclick="setFloor('dest','1',this)">1F</div>
+          <div class="floor-tab" onclick="setFloor('dest','2',this)">2F</div>
+          <div class="floor-tab" onclick="setFloor('dest','3',this)">3F</div>
+          <div class="floor-tab" onclick="setFloor('dest','4',this)">4F</div>
+        </div>
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="destSearch" placeholder="Search rooms, labs, offices…" oninput="renderList('dest')">
+        </div>
+        <div class="loc-list" id="destList"></div>
+        <div class="selected-info dest" id="destInfo"></div>
+      </div>
+    </div>
+
+    <button class="btn-nav" id="navBtn" onclick="navigate()" disabled>⚡ GET DIRECTIONS</button>
+  </div>
+
+  <div class="right-panel">
+    <div class="route-card">
+      <div class="route-card-head">
+        <span class="route-title">▸ NAVIGATION ROUTE</span>
+        <button class="btn-sm" id="resetBtn" onclick="resetRoute()" style="display:none">↩ Reset</button>
+      </div>
+      <div class="route-card-body">
+        <div class="placeholder" id="placeholder">
+          <div class="placeholder-icon">🗺</div>
+          <h4>SELECT LOCATIONS</h4>
+          <p>Pick a starting point and destination from the left panel. Directions are generated instantly — no internet required.</p>
+        </div>
+        <div class="error-box" id="errorBox">
+          <div class="error-icon-big">⚠</div>
+          <h3 class="error-title-big">NAVIGATION ERROR</h3>
+          <p class="error-msg" id="errorMsg"></p>
+        </div>
+        <div class="results-box" id="resultsBox">
+          <div class="summary-bar" id="summaryBar"></div>
+          <div class="dir-list" id="dirList"></div>
+          <div class="route-note" id="routeNote" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend-card">
+      <div class="legend-title">Room Type Legend</div>
+      <div class="legend-grid">
+        <div class="legend-item"><div class="legend-swatch" style="background:#60a5fa"></div>Lecture Halls</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#4ade80"></div>UCSC Divisions</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#f87171"></div>Laboratories</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#c084fc"></div>Student Areas</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#fb923c"></div>Computer Museum</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#2dd4bf"></div>Library</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#facc15"></div>Staff Rooms</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#f97316"></div>Research Area</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#e879f9"></div>Digital Studio</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
