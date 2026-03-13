@@ -212,10 +212,16 @@ function distLabel(steps) {
 }
 
 function buildDirections(from, to) {
+  // First-Year Constraint: Strictly exclude elevators/lifts, permit staircases
+  const isElevator = (l) => l.type === 'lift' && !l.id.includes('stairs');
+  if (isElevator(from) || isElevator(to)) {
+    return null;
+  }
   const steps = [];
   const sameFloor = from.f === to.f;
   const fromFloor = parseInt(from.f);
   const toFloor   = parseInt(to.f);
+  const stairsRequired = !sameFloor;
 
   // Step 1 — Start
   steps.push({
@@ -285,56 +291,47 @@ function buildDirections(from, to) {
   } else {
     // ── CROSS FLOOR ──
     const goingUp = toFloor > fromFloor;
-    const liftType = toFloor === 4 ? 'New Lift' : 'New Lift or Old Lift';
     const liftDir  = goingUp ? 'up' : 'down';
 
-    // Walk to lift from starting location
+    // Walk to stairwell from starting location
     if (from.wing !== 'center') {
       const hDir = horizontalDir(from.pos || from.wing, 'center');
       if (hDir) {
         steps.push({
           icon:'🚶', type:'walk',
-          instruction:`From <strong>${from.name}</strong>, walk <strong>${hDir}</strong> along the corridor towards the central lift lobby.`,
+          instruction:`From <strong>${from.name}</strong>, walk <strong>${hDir}</strong> along the corridor towards the central stairwell area.`,
           dist: distLabel(stepsBetween(from, {pos:'center'}))
         });
       } else {
         steps.push({
           icon:'🚶', type:'walk',
-          instruction:`Walk to the <strong>central corridor</strong> near the lift area on the ${floorName(from.f)}.`,
+          instruction:`Walk to the <strong>central corridor</strong> near the stairwell area on the ${floorName(from.f)}.`,
           dist:'~25m'
         });
       }
     }
 
-    // Take lift
-    if (toFloor === 4) {
-      steps.push({
-        icon:'🛗', type:'lift', isFloor:true,
-        instruction:`Take the <strong>New Lift</strong> ${liftDir} to the <strong>${floorName(to.f)}</strong>. (Only the New Lift serves Floor 4.)`,
-        dist:''
-      });
-    } else {
-      steps.push({
-        icon:'🛗', type:'lift', isFloor:true,
-        instruction:`Take the <strong>${liftType}</strong> ${liftDir} to the <strong>${floorName(to.f)}</strong>.`,
-        dist:''
-      });
-    }
+    // Take stairs
+    steps.push({
+      icon:'🧗', type:'lift', isFloor:true,
+      instruction:`Take the <strong>Staircase</strong> ${liftDir} to the <strong>${floorName(to.f)}</strong>.`,
+      dist:''
+    });
 
     // If multiple floors in between
     const floorsSkipped = Math.abs(toFloor - fromFloor) - 1;
     if (floorsSkipped > 0) {
       steps.push({
         icon:'↕', type:'floor-change', isFloor:true,
-        instruction:`Pass through ${floorsSkipped} intermediate floor${floorsSkipped>1?'s':''} without exiting.`,
+        instruction:`Pass through ${floorsSkipped} intermediate floor${floorsSkipped>1?'s':''} via the stairs.`,
         dist:''
       });
     }
 
-    // Exit lift
+    // Exit stairwell
     steps.push({
       icon:'🚪', type:'walk',
-      instruction:`Exit the lift on the <strong>${floorName(to.f)}</strong>. You are now in the central corridor.`,
+      instruction:`Exit the stairwell on the <strong>${floorName(to.f)}</strong>. You are now in the central corridor.`,
       dist:''
     });
     // Walk to destination on target floor
@@ -417,6 +414,13 @@ function renderList(side) {
   const query  = document.getElementById(side+'Search').value.toLowerCase().trim();
   const selId  = (side==='start' ? selStart : selDest)?.id;
   const filtered = LOCS.filter(l=>{
+    // First-Year Constraint: Filter restroom database to exclusively 1st floor
+    if (l.id.includes('toilets') && l.f !== '1') return false;
+    
+    // First-Year Constraint: Strictly exclude elevators/lifts, permit staircases
+    const isElevator = l.type === 'lift' && !l.id.includes('stairs');
+    if (isElevator) return false;
+
     const fOk = floor==='all' || l.f===floor;
     const qOk = !query || l.name.toLowerCase().includes(query);
     return fOk && qOk;
@@ -441,7 +445,14 @@ function selectLoc(side, id) {
   if (side==='start') selStart=loc; else selDest=loc;
   renderList(side);
   const info = document.getElementById(side+'Info');
-  info.textContent = `✓ ${loc.name}  ·  Floor ${loc.f}`;
+  
+  // First-Year Constraint: Ground floor restroom warning
+  const hasRestroomInBuilding = LOCS.some(r => r.f === '1' && r.id.includes('toilets') && r.wing === loc.wing);
+  const warning = (side === 'dest' && !hasRestroomInBuilding) 
+    ? '<br><span style="color:var(--accent-orange);font-weight:bold">⚠ Ground floor restroom unavailable</span>' 
+    : '';
+
+  info.innerHTML = `✓ ${loc.name}  ·  Floor ${loc.f}${warning}`;
   info.classList.add('show');
   document.getElementById(side+'Label').textContent = loc.name;
   document.getElementById('navBtn').disabled = !(selStart && selDest);
@@ -465,10 +476,24 @@ function navigate() {
     return;
   }
 
-  const { steps, totalDist, totalTime, floors } = buildDirections(selStart, selDest);
+  const result = buildDirections(selStart, selDest);
+  if (!result) {
+    showError('First-Year Constraint: Strictly exclude elevators/lifts. Navigation via staircases is permitted.');
+    return;
+  }
+  const { steps, totalDist, totalTime, floors } = result;
 
   document.getElementById('resetBtn').style.display='block';
   setView('results');
+  
+  const crossFloor = selStart.f !== selDest.f;
+  const stairsTag = crossFloor 
+    ? `<div class="summary-stat">
+         <div class="ss-label" style="color:var(--accent-orange)">Stairs Required</div>
+         <div class="ss-value orange">YES</div>
+       </div>`
+    : '';
+
   document.getElementById('summaryBar').innerHTML = `
     <div class="summary-stat">
       <div class="ss-label">From</div>
@@ -489,7 +514,8 @@ function navigate() {
     <div class="summary-stat">
       <div class="ss-label">Floors</div>
       <div class="ss-value yellow">${floors.join(' → ')}</div>
-    </div>`;
+    </div>
+    ${stairsTag}`;
   const list = document.getElementById('dirList');
   list.innerHTML = '';
   steps.forEach((s,i)=>{
@@ -509,9 +535,8 @@ function navigate() {
   });
 
   const noteEl = document.getElementById('routeNote');
-  const crossFloor = selStart.f !== selDest.f;
   const noteText = crossFloor
-    ? `Use the <strong>New Lift</strong> to reach Floor ${selDest.f}${parseInt(selDest.f)===4?' — only the New Lift serves the 4th floor':' (Old Lift also available for floors 1–3)'}. Stairs are adjacent to the lifts if preferred.`
+    ? `Please use the <strong>central stairwell</strong> to transition between floors. Elevators/lifts are strictly excluded from this route per First-Year constraints.`
     : `All directions are on the <strong>${floorName(selDest.f)}</strong>. Follow the brown corridor lines marked on the floor map for the main walking routes.`;
   noteEl.innerHTML = `<strong>ℹ Tip:</strong> ${noteText}`;
   noteEl.style.display='block';
